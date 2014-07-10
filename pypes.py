@@ -15,11 +15,14 @@ class FuncType():
 
 
 class AnyType():
+    def __init__(self, magic_words=None):
+        if magic_words != "nuh-uh-uh":
+            raise Exception("Shouldn't instantiate AnyType")
     def __str__(self):
         return "?"
 
 
-unknown = AnyType()
+unknown = AnyType("nuh-uh-uh")
 
 
 class SomeType():
