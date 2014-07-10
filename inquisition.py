@@ -7,20 +7,47 @@ import pypes
 from pypes import Heresy
 
 
+class LazyError(Exception):
+    ast_obj = None
+    message = None
+    def __init__(self, message, ast_obj=None):
+        self.message = message
+        self.ast_obj = ast_obj
+
+    def __repr__(self):
+        return "<LazyError %s %s>" % (repr(self.message), self.ast_obj)
+
+    def __str__(self):
+        return self.message
+
+
 def main(f):
     contents = open(f, 'r').read()
     code = ast.parse(contents, filename=f)
 
+    run_through(code.body)
+
+
+def run_through(exprs: list):
+
     env = Env()
 
-    for val in code.body:
+    for val in exprs:
         try:
             if isinstance(val, ast.FunctionDef):
                 env.add(val.name, get_type(val, env))
+            elif isinstance(val, ast.Assign):
+                if not isinstance(val.targets[0], ast.Name):
+                    raise LazyError("Don't know how to deal with tuple assignment", val)
+                if len(val.targets) > 1:
+                    raise LazyError("Don't know how to deal with multiple targets.", val)
+                env.add(val.targets[0].id, get_type(val.value, env))
             else:
                 get_type(val, env)
         except Heresy as e:
             print(str(e))
+        except LazyError as e:
+            print("Unimplemented: " + e.message)
 
     for k, v in env.values.items():
         print("%s :: %s" % (k, v))
@@ -29,6 +56,8 @@ def main(f):
 def get_type(val, env):
     if isinstance(val, ast.FunctionDef):
         return get_function_type(val, env)
+    elif isinstance(val, ast.Assign):
+        raise LazyError("run_through should handle ast.Assign, not get_type")
     elif isinstance(val, ast.Expr):
         get_expr_type(val, env)
     elif isinstance(val, ast.Str):
@@ -39,9 +68,9 @@ def get_type(val, env):
         elif isinstance(val.n, float):
             return 'float'
         else:
-            raise ValueError("Don't understand " + repr(val.n))
+            raise LazyError("Don't understand " + repr(val.n))
     else:
-        raise ValueError("Don't understand " + repr(val))
+        raise LazyError("Don't understand " + repr(val))
 
 
 def get_function_type(ast_func, env):
@@ -64,7 +93,11 @@ def get_expr_type(expr, env):
     if isinstance(expr.value, ast.Call):
         return get_call_type(expr.value, env)
     else:
-        raise ValueError("Don't understand " + repr(expr))
+        raise LazyError("Don't understand " + repr(expr))
+
+
+def get_assign_type(expr, env):
+    return get_type(expr.value)
 
 
 def is_callable(t):

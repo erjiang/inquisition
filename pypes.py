@@ -22,7 +22,8 @@ class AnyType():
 unknown = AnyType()
 
 
-class OptionType():
+class SomeType():
+    """Annoy PL nerds who talk about Sum types."""
     options = []
     def __init__(self, *args):
         self.options = args
