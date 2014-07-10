@@ -9,6 +9,11 @@ from pypes import Heresy, Suspicion
 DEBUG_LEVEL = 3
 
 
+# map ast binop objects to python methods
+BINOPS = {
+    ast.Add: "__add__"
+}
+
 class LazyError(Exception):
     ast_obj = None
     message = None
