@@ -36,5 +36,11 @@ class Env():
     def add(self, k, v):
         self.values[k] = v
 
-    def extend(env):
+    def extend(self):
         return Env(parent=self)
+
+    def __repr__(self):
+        if self.parent is None:
+            return "(" + " ".join(["%s:%s" % (k, v) for (k, v) in self.values.items()]) + ")"
+        else:
+            return "(" + " ".join(["%s:%s" % (k, v) for (k, v) in self.values.items()]) + " " + self.parent.__repr__() + ")"

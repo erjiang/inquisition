@@ -11,7 +11,7 @@ class FuncType():
     def __str__(self):
         kwargs = ["%s=%s" % (k, v) for k, v in self.kwargs]
         args = ", ".join(list(map(str, self.args)) + self.kwargs)
-        return "%s -> %s" % (args, str(self.ret))
+        return "(%s) -> %s" % (args, str(self.ret))
 
 
 class AnyType():
