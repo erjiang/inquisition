@@ -32,7 +32,7 @@ class SomeType():
 class Heresy(Exception):
     ast_obj = None
     message = None
-    def __init__(self, message, ast_obj=None):
+    def __init__(self, message, ast_obj):
         self.message = message 
         self.ast_obj = ast_obj
 
@@ -40,4 +40,4 @@ class Heresy(Exception):
         return "<TypeError %s %s>" % (repr(self.message), self.ast_obj)
 
     def __str__(self):
-        return self.message
+        return str(self.ast_obj.lineno) + ": " + self.message

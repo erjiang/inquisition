@@ -6,6 +6,8 @@ from env import Env
 import pypes
 from pypes import Heresy
 
+DEBUG_LEVEL = 3
+
 
 class LazyError(Exception):
     ast_obj = None
@@ -47,7 +49,8 @@ def run_through(exprs: list, env, top_level=False):
         except Heresy as e:
             print(str(e))
         except LazyError as e:
-            print("Unimplemented: " + e.message)
+            if DEBUG_LEVEL > 0:
+                print("Unimplemented: " + e.message)
 
     for val in exprs:
         try:
@@ -56,9 +59,10 @@ def run_through(exprs: list, env, top_level=False):
         except Heresy as e:
             print(str(e))
         except LazyError as e:
-            print("Unimplemented: " + e.message)
+            if DEBUG_LEVEL > 0:
+                print("Unimplemented: " + e.message)
 
-    if top_level:
+    if top_level and DEBUG_LEVEL > 0:
         for k, v in env.values.items():
             print("%s :: %s" % (k, v))
 
@@ -98,7 +102,8 @@ def get_func_type_for_real(func, env):
     """Uses both the declared type and the inferred type."""
     declared_type = get_func_type(func, env)
     # create a new scope!!
-    print("Diving into %s" % func.name)
+    if DEBUG_LEVEL > 1:
+        print("Diving into %s" % func.name)
     apparent_type = get_func_body_type(func.body, env.extend())
     return declared_type
 
@@ -136,7 +141,6 @@ def is_callable(t):
 def get_call_type(call, env):
     if call.func.id in env:
         func_t = env[call.func.id]
-        print(env)
         if len(call.args) != len(func_t.args):
             raise Heresy("Function %s expects %d arguments, %d provided" %
                             (call.func.id, len(call.args), len(func_t.args)),
@@ -146,7 +150,8 @@ def get_call_type(call, env):
             call_arg_t = get_type(arg, env)
             if call_arg_t != arg_t:
                 raise Heresy("Argument %d of call to %s should be %s, not %s" %
-                                (idx, call.func.id, arg_t, call_arg_t))
+                             (idx, call.func.id, arg_t, call_arg_t),
+                             call)
         return func_t.ret
     else:
         raise Heresy("Tried calling %s which doesn't seem to exist" %
