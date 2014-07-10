@@ -6,6 +6,7 @@ from env import Env
 import pypes
 from pypes import Heresy
 
+
 def main(f):
     contents = open(f, 'r').read()
     code = ast.parse(contents, filename=f)
@@ -51,11 +52,13 @@ def get_function_type(ast_func, env):
         rv = pypes.unknown
     return pypes.FuncType(params, rv)
 
+
 def get_arg_type(ast_arg, env):
     if ast_arg.annotation:
         return ast_arg.annotation.id
     else:
         return pypes.unknown
+
 
 def get_expr_type(expr, env):
     if isinstance(expr.value, ast.Call):
@@ -84,6 +87,11 @@ def get_call_type(call, env):
             if call_arg_t != arg_t:
                 raise Heresy("Argument %d of call to %s should be %s, not %s" %
                                 (idx, call.func.id, arg_t, call_arg_t))
+        return func_t.ret
+    else:
+        raise Heresy("Tried calling %s which doesn't seem to exist" %
+                     (call.func.id),
+                     call)
 
 
 if __name__ == "__main__":

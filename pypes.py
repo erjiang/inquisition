@@ -1,17 +1,17 @@
 class FuncType():
     args = []
     kwargs = []
-    r = None
+    ret = None
     def __init__(self, args, rv, kwargs=None):
         self.args = args
-        self.r = rv
+        self.ret = rv
         if kwargs is not None:
             self.kwargs = kwargs
 
     def __str__(self):
         kwargs = ["%s=%s" % (k, v) for k, v in self.kwargs]
         args = ", ".join(list(map(str, self.args)) + self.kwargs)
-        return "%s -> %s" % (args, str(self.r))
+        return "%s -> %s" % (args, str(self.ret))
 
 
 class AnyType():
