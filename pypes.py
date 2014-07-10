@@ -37,7 +37,12 @@ class Heresy(Exception):
         self.ast_obj = ast_obj
 
     def __repr__(self):
-        return "<TypeError %s %s>" % (repr(self.message), self.ast_obj)
+        return "<Heresy %s %s>" % (repr(self.message), self.ast_obj)
 
     def __str__(self):
         return str(self.ast_obj.lineno) + ": " + self.message
+
+
+class Suspicion(Heresy):
+    def __repr__(self):
+        return "<Suspicion %s %s>" % (repr(self.message), self.ast_obj)

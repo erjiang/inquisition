@@ -4,7 +4,7 @@ import ast
 import sys
 from env import Env
 import pypes
-from pypes import Heresy
+from pypes import Heresy, Suspicion
 
 DEBUG_LEVEL = 3
 
@@ -34,6 +34,8 @@ def main(f):
 
 def run_through(exprs: list, env, top_level=False):
 
+    return_type = None
+
     for val in exprs:
         try:
             if isinstance(val, ast.FunctionDef):
@@ -44,6 +46,8 @@ def run_through(exprs: list, env, top_level=False):
                 if len(val.targets) > 1:
                     raise LazyError("Don't know how to deal with multiple targets.", val)
                 env.add(val.targets[0].id, get_type(val.value, env))
+            elif isinstance(val, ast.Return):
+                return_type = get_type(val.value, env)
             else:
                 get_type(val, env)
         except Heresy as e:
@@ -66,6 +70,7 @@ def run_through(exprs: list, env, top_level=False):
         for k, v in env.values.items():
             print("%s :: %s" % (k, v))
 
+    return return_type
 
 def get_type(val, env):
     if isinstance(val, ast.FunctionDef):
@@ -104,14 +109,18 @@ def get_func_type_for_real(func, env):
     # create a new scope!!
     if DEBUG_LEVEL > 1:
         print("Diving into %s" % func.name)
-    apparent_type = get_func_body_type(func.body, env.extend())
+    apparent_return_type = get_func_body_type(func.body, env.extend())
+    if apparent_return_type != declared_type.ret and declared_type.ret != pypes.unknown:
+        raise Heresy("Return type of %s declared as %s but seems to be %s" %
+                     (func.name, declared_type.ret, apparent_return_type),
+                     func)
     return declared_type
 
 
 def get_func_body_type(exprs, env):
     """Given a list of exprs, get the type of what the list returns. E.g., look
     for a return statement."""
-    run_through(exprs, env)
+    return run_through(exprs, env)
 
 def get_arg_type(ast_arg, env):
     if ast_arg.annotation:
