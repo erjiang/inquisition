@@ -46,6 +46,8 @@ def run_through(exprs: list, env, top_level=False):
 
     return_type = None
 
+    errors = set()
+
     for val in exprs:
         try:
             if isinstance(val, ast.FunctionDef):
@@ -61,7 +63,10 @@ def run_through(exprs: list, env, top_level=False):
             else:
                 get_type(val, env)
         except Heresy as e:
-            print(str(e))
+            if top_level:
+                errors.add(e)
+            else:
+                raise e
         except LazyError as e:
             if DEBUG_LEVEL > 0:
                 print("Unimplemented: " + str(e))
@@ -71,10 +76,16 @@ def run_through(exprs: list, env, top_level=False):
             if isinstance(val, ast.FunctionDef):
                 env.add(val.name, get_func_type_for_real(val, env))
         except Heresy as e:
-            print(str(e))
+            if top_level:
+                errors.add(e)
+            else:
+                raise e
         except LazyError as e:
             if DEBUG_LEVEL > 0:
                 print("Unimplemented: " + e.message)
+
+    for e in sorted(errors, key=lambda e: e.ast_obj.lineno):
+        print(str(e))
 
     if top_level and DEBUG_LEVEL > 0:
         for k, v in env.values.items():
