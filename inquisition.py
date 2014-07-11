@@ -19,6 +19,15 @@ BINOPS = {
     "Mult": "__mul__"
 }
 
+# map these constants to their types so that we don't interpret them as vars
+# we'll just yell at you if you try to redefine them
+CONSTANTS = {
+    "None": "None",
+    "True": "bool",
+    "False": "bool"
+}
+
+
 class LazyError(Exception):
     ast_obj = None
     message = None
@@ -42,7 +51,7 @@ def main(f):
     run_through(code.body, env, top_level=True)
 
 
-def run_through(exprs: list, env, top_level=False):
+def run_through(exprs, env, top_level=False):
 
     return_type = None
 
@@ -57,6 +66,8 @@ def run_through(exprs: list, env, top_level=False):
                     raise LazyError("Don't know how to deal with tuple assignment", val)
                 if len(val.targets) > 1:
                     raise LazyError("Don't know how to deal with multiple targets.", val)
+                if val.targets[0].id in CONSTANTS:
+                    raise Heresy("Tried to redefine built-in '%s'" % val.targets[0].id, val)
                 env.add(val.targets[0].id, get_type(val.value, env))
             elif isinstance(val, ast.Return):
                 return_type = get_type(val.value, env)
@@ -96,11 +107,10 @@ def run_through(exprs: list, env, top_level=False):
 def get_type(val, env):
     if isinstance(val, ast.FunctionDef):
         return get_func_type(val, env)
+    elif isinstance(val, ast.Call):
+        return get_call_type(val, env)
     elif isinstance(val, ast.Name):
-        if val.id in env:
-            return env[val.id]
-        else:
-            raise Heresy("Tried using var '%s' but it wasn't defined." % val.id, val)
+        return get_name_type(val, env)
     elif isinstance(val, ast.Assign):
         raise LazyError("run_through should handle ast.Assign, not get_type", val)
     elif isinstance(val, ast.Expr):
@@ -120,6 +130,15 @@ def get_type(val, env):
         return get_binop_type(val, env)
     else:
         raise LazyError("Don't understand val " + repr(val), val)
+
+
+def get_name_type(expr, env):
+    if expr.id in CONSTANTS:
+        return CONSTANTS[expr.id]
+    if expr.id in env:
+        return env[expr.id]
+    else:
+        raise Heresy("Tried using var '%s' but it wasn't defined." % expr.id, expr)
 
 
 def get_func_type(ast_func, env):
@@ -167,14 +186,11 @@ def get_arg_type(ast_arg, env):
 
 
 def get_expr_type(expr, env):
-    if isinstance(expr.value, ast.Call):
-        return get_call_type(expr.value, env)
-    else:
-        raise LazyError("Don't understand expr " + repr(expr), val)
+    return get_type(expr.value, env)
 
 
 def get_assign_type(expr, env):
-    return get_type(expr.value)
+    return get_type(expr.value, env)
 
 
 def is_callable(t):
@@ -185,6 +201,8 @@ def is_callable(t):
 
 
 def get_call_type(call, env):
+    if isinstance(call.func, ast.Attribute):
+        raise LazyError("Don't know how to do method calls.", call)
     if call.func.id in env:
         func_t = env[call.func.id]
         if len(call.args) != len(func_t.args):
@@ -194,7 +212,7 @@ def get_call_type(call, env):
         for idx, args in enumerate(zip(call.args, func_t.args)):
             arg, arg_t = args
             call_arg_t = get_type(arg, env)
-            if call_arg_t != arg_t:
+            if not pypes.type_fits(call_arg_t, arg_t):
                 raise Heresy("Argument %d of call to %s should be %s, not %s" %
                              (idx, call.func.id, arg_t, call_arg_t),
                              call)

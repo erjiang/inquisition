@@ -17,13 +17,15 @@ class FuncType(Type):
         if kwargs is not None:
             self.kwargs = kwargs
 
-    def __repr__(self):
-        return "<FuncType %s>" % self.__str__()
+    def accepts_args(self, given_args):
+        if len(self.args) != len(given_args):
+            return False
 
-    def __str__(self):
-        kwargs = ["%s=%s" % (k, v) for k, v in self.kwargs]
-        args = ", ".join(list(map(str, self.args)) + self.kwargs)
-        return "(%s) -> %s" % (args, str(self.ret))
+        for idx, args in enumerate(zip(self.args, given_args)):
+            my_arg, call_arg = args
+            if not type_fits(call_arg, my_arg):
+                return False
+        return True
 
     def accepts(self, T):
         if not isinstance(T, FuncType):
@@ -35,6 +37,14 @@ class FuncType(Type):
         # check that all the args match
         # TODO: kwargs
         return all([type_fits(A, B) for A, B in zip(self.args, T.args)])
+
+    def __repr__(self):
+        return "<FuncType %s>" % self.__str__()
+
+    def __str__(self):
+        kwargs = ["%s=%s" % (k, v) for k, v in self.kwargs]
+        args = ", ".join(list(map(str, self.args)) + self.kwargs)
+        return "(%s) -> %s" % (args, str(self.ret))
 
 
 class AnyType(Type):
@@ -57,10 +67,20 @@ unknown = AnyType("nuh-uh-uh")
 # need to pattern match on function args
 class Overload(set): # :: set(FuncType)
     def for_args(self, ls):
+        possibilities = set()
         for overload in self:
-            if overload.args == ls:
-                return overload.ret
-        raise ValueError("Not in here.")
+            if len(overload.args) != len(ls):
+                continue
+            if all([type_fits(A, B) for A, B in zip(ls, overload.args)]):
+                possibilities.add(overload.ret)
+        return possibilities
+
+    def accepts_args(self, ls):
+        """
+        Just check to see if there are any possible return types. If we get the
+        empty set, it means it couldn't match on any of the overloads.
+        """
+        return self.for_args(ls)
 
     def accepts(self, T):
         return any([type_fits(T, X) for X in self])
@@ -110,7 +130,7 @@ class Heresy(Exception):
     ast_obj = None
     message = None
     def __init__(self, message, ast_obj):
-        self.message = message 
+        self.message = message
         self.ast_obj = ast_obj
 
     def __repr__(self):
