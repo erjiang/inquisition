@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 
 import ast
+import os
 import sys
+
+
 from env import Env
 import pypes
 from pypes import Heresy, Suspicion
 from typiary import builtins
 
-DEBUG_LEVEL = 3
+DEBUG_LEVEL = 0
 
 
 # map ast binop objects to python methods
@@ -222,4 +225,6 @@ def get_binop_type(expr, env):
 
 
 if __name__ == "__main__":
+    if 'DEBUG' in os.environ:
+        DEBUG_LEVEL = int(os.environ['DEBUG'])
     main(sys.argv[1])
