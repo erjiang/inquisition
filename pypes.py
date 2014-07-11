@@ -17,6 +17,9 @@ class FuncType(Type):
         if kwargs is not None:
             self.kwargs = kwargs
 
+    def __repr__(self):
+        return "<FuncType %s>" % self.__str__()
+
     def __str__(self):
         kwargs = ["%s=%s" % (k, v) for k, v in self.kwargs]
         args = ", ".join(list(map(str, self.args)) + self.kwargs)
@@ -57,7 +60,7 @@ class Overload(set): # :: set(FuncType)
         for overload in self:
             if overload.args == ls:
                 return overload.ret
-        raise Heresy("No.")
+        raise ValueError("Not in here.")
 
     def accepts(self, T):
         return any([type_fits(T, X) for X in self])
@@ -74,6 +77,8 @@ def type_fits(A, B):
     """
     if A == B:  # if B is a str or A==B
         return True
+    elif isinstance(B, str):
+        return False # by this point we know that A != B
     elif B == unknown:
         return True
     else:  # assume that B is a Type sub-class

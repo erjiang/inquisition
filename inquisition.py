@@ -12,7 +12,8 @@ DEBUG_LEVEL = 3
 
 # map ast binop objects to python methods
 BINOPS = {
-    ast.Add: "__add__"
+    "Add": "__add__",
+    "Mult": "__mul__"
 }
 
 class LazyError(Exception):
@@ -26,7 +27,7 @@ class LazyError(Exception):
         return "<LazyError %s %s>" % (repr(self.message), self.ast_obj)
 
     def __str__(self):
-        return self.message
+        return str(self.ast_obj.lineno) + ": " + self.message
 
 
 def main(f):
@@ -60,7 +61,7 @@ def run_through(exprs: list, env, top_level=False):
             print(str(e))
         except LazyError as e:
             if DEBUG_LEVEL > 0:
-                print("Unimplemented: " + e.message)
+                print("Unimplemented: " + str(e))
 
     for val in exprs:
         try:
@@ -81,8 +82,13 @@ def run_through(exprs: list, env, top_level=False):
 def get_type(val, env):
     if isinstance(val, ast.FunctionDef):
         return get_func_type(val, env)
+    elif isinstance(val, ast.Name):
+        if val.id in env:
+            return env[val.id]
+        else:
+            raise Heresy("Tried using var '%s' but it wasn't defined." % val.id, val)
     elif isinstance(val, ast.Assign):
-        raise LazyError("run_through should handle ast.Assign, not get_type")
+        raise LazyError("run_through should handle ast.Assign, not get_type", val)
     elif isinstance(val, ast.Expr):
         get_expr_type(val, env)
     elif isinstance(val, ast.Str):
@@ -92,10 +98,14 @@ def get_type(val, env):
             return 'int'
         elif isinstance(val.n, float):
             return 'float'
+        elif isinstance(val.n, complex):
+            return 'complex'
         else:
-            raise LazyError("Don't understand " + repr(val.n))
+            raise LazyError("Don't understand Num " + repr(val.n), val)
+    elif isinstance(val, ast.BinOp):
+        return get_binop_type(val, env)
     else:
-        raise LazyError("Don't understand " + repr(val))
+        raise LazyError("Don't understand val " + repr(val), val)
 
 
 def get_func_type(ast_func, env):
@@ -115,11 +125,18 @@ def get_func_type_for_real(func, env):
     # create a new scope!!
     if DEBUG_LEVEL > 1:
         print("Diving into %s" % func.name)
+
+    body_env = env.extend()
+
+    for arg in func.args.args:
+        body_env.add(arg.arg, get_arg_type(arg, env))
+
     apparent_return_type = get_func_body_type(func.body, env.extend())
-    if apparent_return_type != declared_type.ret and declared_type.ret != pypes.unknown:
-        raise Heresy("Return type of %s declared as %s but seems to be %s" %
+    if not pypes.type_fits(apparent_return_type, declared_type.ret):
+        raise Heresy("Return type of '%s' declared as '%s' but seems to be '%s'" %
                      (func.name, declared_type.ret, apparent_return_type),
                      func)
+    declared_type.ret = apparent_return_type
     return declared_type
 
 
@@ -139,7 +156,7 @@ def get_expr_type(expr, env):
     if isinstance(expr.value, ast.Call):
         return get_call_type(expr.value, env)
     else:
-        raise LazyError("Don't understand " + repr(expr))
+        raise LazyError("Don't understand expr " + repr(expr), val)
 
 
 def get_assign_type(expr, env):
@@ -158,7 +175,7 @@ def get_call_type(call, env):
         func_t = env[call.func.id]
         if len(call.args) != len(func_t.args):
             raise Heresy("Function %s expects %d arguments, %d provided" %
-                            (call.func.id, len(call.args), len(func_t.args)),
+                            (call.func.id, len(func_t.args), len(call.args)),
                             call)
         for idx, args in enumerate(zip(call.args, func_t.args)):
             arg, arg_t = args
@@ -172,6 +189,36 @@ def get_call_type(call, env):
         raise Heresy("Tried calling %s which doesn't seem to exist" %
                      (call.func.id),
                      call)
+
+
+def get_binop_type(expr, env):
+    """
+    expr should be an ast.BinOp, and this needs to convert the binop to the
+    corresponding method on the left type.
+    Only builtin types supported right now :(
+    TODO: add support for custom types
+    """
+    left_t = get_type(expr.left, env)
+    right_t = get_type(expr.right, env)
+
+    # lookup which method goes with this binop
+    # can't directly do BINOPS[expr.op], unfortunately
+    binop_method = BINOPS[expr.op.__class__.__name__]
+
+    if left_t not in builtins.builtins:
+        if DEBUG_LEVEL > 0:
+            print("Type %s is not recognized. Can't typecheck this binop." % left_t)
+        return pypes.unknown
+
+    binop_t = builtins.builtins[left_t][binop_method]
+    # should be a FuncType
+
+    try:
+        return binop_t.for_args([left_t, right_t])
+    except ValueError:
+        raise Heresy("Tried doing (%s %s %s) which doesn't match type %s" %
+                     (left_t, expr.op.__class__.__name__, right_t, binop_t),
+                     expr)
 
 
 if __name__ == "__main__":
