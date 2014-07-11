@@ -57,22 +57,22 @@ def run_through(exprs, env, top_level=False):
 
     errors = set()
 
-    for val in exprs:
+    for expr in exprs:
         try:
-            if isinstance(val, ast.FunctionDef):
-                env.add(val.name, get_func_type(val, env))
-            elif isinstance(val, ast.Assign):
-                if not isinstance(val.targets[0], ast.Name):
-                    raise LazyError("Don't know how to deal with tuple assignment", val)
-                if len(val.targets) > 1:
-                    raise LazyError("Don't know how to deal with multiple targets.", val)
-                if val.targets[0].id in CONSTANTS:
-                    raise Heresy("Tried to redefine built-in '%s'" % val.targets[0].id, val)
-                env.add(val.targets[0].id, get_type(val.value, env))
-            elif isinstance(val, ast.Return):
-                return_type = get_type(val.value, env)
+            if isinstance(expr, ast.FunctionDef):
+                env.add(expr.name, get_func_type(expr, env))
+            elif isinstance(expr, ast.Assign):
+                if not isinstance(expr.targets[0], ast.Name):
+                    raise LazyError("Don't know how to deal with tuple assignment", expr)
+                if len(expr.targets) > 1:
+                    raise LazyError("Don't know how to deal with multiple targets.", expr)
+                if expr.targets[0].id in CONSTANTS:
+                    raise Heresy("Tried to redefine built-in '%s'" % expr.targets[0].id, expr)
+                env.add(expr.targets[0].id, get_type(expr.value, env))
+            elif isinstance(expr, ast.Return):
+                return_type = get_type(expr.value, env)
             else:
-                get_type(val, env)
+                get_type(expr, env)
         except Heresy as e:
             if top_level:
                 errors.add(e)
@@ -82,10 +82,10 @@ def run_through(exprs, env, top_level=False):
             if DEBUG_LEVEL > 0:
                 print("Unimplemented: " + str(e))
 
-    for val in exprs:
+    for expr in exprs:
         try:
-            if isinstance(val, ast.FunctionDef):
-                env.add(val.name, get_func_type_for_real(val, env))
+            if isinstance(expr, ast.FunctionDef):
+                env.add(expr.name, get_func_type_for_real(expr, env))
         except Heresy as e:
             if top_level:
                 errors.add(e)
@@ -104,32 +104,32 @@ def run_through(exprs, env, top_level=False):
 
     return return_type
 
-def get_type(val, env):
-    if isinstance(val, ast.FunctionDef):
-        return get_func_type(val, env)
-    elif isinstance(val, ast.Call):
-        return get_call_type(val, env)
-    elif isinstance(val, ast.Name):
-        return get_name_type(val, env)
-    elif isinstance(val, ast.Assign):
-        raise LazyError("run_through should handle ast.Assign, not get_type", val)
-    elif isinstance(val, ast.Expr):
-        get_expr_type(val, env)
-    elif isinstance(val, ast.Str):
+def get_type(expr, env):
+    if isinstance(expr, ast.FunctionDef):
+        return get_func_type(expr, env)
+    elif isinstance(expr, ast.Call):
+        return get_call_type(expr, env)
+    elif isinstance(expr, ast.Name):
+        return get_name_type(expr, env)
+    elif isinstance(expr, ast.Assign):
+        raise LazyError("run_through should handle ast.Assign, not get_type", expr)
+    elif isinstance(expr, ast.Expr):
+        get_expr_type(expr, env)
+    elif isinstance(expr, ast.Str):
         return "str"
-    elif isinstance(val, ast.Num):
-        if isinstance(val.n, int):
+    elif isinstance(expr, ast.Num):
+        if isinstance(expr.n, int):
             return 'int'
-        elif isinstance(val.n, float):
+        elif isinstance(expr.n, float):
             return 'float'
-        elif isinstance(val.n, complex):
+        elif isinstance(expr.n, complex):
             return 'complex'
         else:
-            raise LazyError("Don't understand Num " + repr(val.n), val)
-    elif isinstance(val, ast.BinOp):
-        return get_binop_type(val, env)
+            raise LazyError("Don't understand Num " + repr(expr.n), expr)
+    elif isinstance(expr, ast.BinOp):
+        return get_binop_type(expr, env)
     else:
-        raise LazyError("Don't understand val " + repr(val), val)
+        raise LazyError("Don't understand expr " + repr(expr), expr)
 
 
 def get_name_type(expr, env):
@@ -141,34 +141,34 @@ def get_name_type(expr, env):
         raise Heresy("Tried using var '%s' but it wasn't defined." % expr.id, expr)
 
 
-def get_func_type(ast_func, env):
+def get_func_type(expr, env):
     """Only looks at the declared type in the signature. Does not examine
     body."""
-    params = [get_arg_type(arg, env) for arg in ast_func.args.args]
-    if ast_func.returns is not None:
-        rv = ast_func.returns.id
+    params = [get_arg_type(arg, env) for arg in expr.args.args]
+    if expr.returns is not None:
+        rv = expr.returns.id
     else:
         rv = pypes.unknown
     return pypes.FuncType(params, rv)
 
 
-def get_func_type_for_real(func, env):
+def get_func_type_for_real(expr, env):
     """Uses both the declared type and the inferred type."""
-    declared_type = get_func_type(func, env)
+    declared_type = get_func_type(expr, env)
     # create a new scope!!
     if DEBUG_LEVEL > 1:
-        print("Diving into %s" % func.name)
+        print("Diving into %s" % expr.name)
 
     body_env = env.extend()
 
-    for arg in func.args.args:
+    for arg in expr.args.args:
         body_env.add(arg.arg, get_arg_type(arg, env))
 
-    apparent_return_type = get_func_body_type(func.body, env.extend())
+    apparent_return_type = get_func_body_type(expr.body, env.extend())
     if not pypes.type_fits(apparent_return_type, declared_type.ret):
         raise Heresy("Return type of '%s' declared as '%s' but seems to be '%s'" %
-                     (func.name, declared_type.ret, apparent_return_type),
-                     func)
+                     (expr.name, declared_type.ret, apparent_return_type),
+                     expr)
     declared_type.ret = apparent_return_type
     return declared_type
 
@@ -186,6 +186,9 @@ def get_arg_type(ast_arg, env):
 
 
 def get_expr_type(expr, env):
+    """
+    This takes an ast.Expr, not to be confused with any old 'expr'.
+    """
     return get_type(expr.value, env)
 
 
