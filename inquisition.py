@@ -5,6 +5,7 @@ import sys
 from env import Env
 import pypes
 from pypes import Heresy, Suspicion
+from typiary import builtins
 
 DEBUG_LEVEL = 3
 

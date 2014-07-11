@@ -25,11 +25,52 @@ class AnyType():
 unknown = AnyType("nuh-uh-uh")
 
 
-class SomeType():
-    """Annoy PL nerds who talk about Sum types."""
-    options = []
-    def __init__(self, *args):
-        self.options = args
+# need to pattern match on function args
+class Overload(set): # :: set(FuncType)
+    def for_args(self, ls):
+        for overload in self:
+            if overload.args == ls:
+                return overload.ret
+        raise Heresy("No.")
+
+
+def type_fits(A, B):
+    """
+    Check whether type A is a valid B.
+    A can be a valid B if any of the following are true:
+      * A==B
+      * B is AnyType
+      * B is SomeType and A is in B
+      * B is Maybe(X) and A is None or X
+    """
+    if A == B:
+        return True
+    elif B == unknown:
+        return True
+    elif isinstance(B, SomeType):
+        return A in B
+    elif isinstance(B, Maybe):
+        return A is None or type_fits(A, B.concrete)
+    else:
+        return False
+
+
+class Maybe():
+    """
+    Represents a Nunnable type - a type that can be either the concrete type,
+    or None. For example, Maybe(int) may be int or may be None.
+    """
+    concrete = None
+    def __init__(self, concrete):
+        if concrete is None:
+            raise ValueError("Can't have Maybe(None) - doesn't make sense")
+        self.concrete = concrete
+
+
+SomeType = set
+
+
+Num = set(['int', 'float'])
 
 
 class Heresy(Exception):
