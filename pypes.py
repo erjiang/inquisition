@@ -67,12 +67,16 @@ unknown = AnyType("nuh-uh-uh")
 # need to pattern match on function args
 class Overload(set): # :: set(FuncType)
     def for_args(self, ls):
-        possibilities = set()
+        possibilities = SomeType()
         for overload in self:
             if len(overload.args) != len(ls):
                 continue
             if all([type_fits(A, B) for A, B in zip(ls, overload.args)]):
                 possibilities.add(overload.ret)
+        if len(possibilities) == 1:
+            return possibilities.pop()
+        if not possibilities:
+            raise ValueError("Can't fit %s to %s", (ls, self))
         return possibilities
 
     def accepts_args(self, ls):

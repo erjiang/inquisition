@@ -48,10 +48,17 @@ def main(f):
 
     env = Env()
 
-    run_through(code.body, env, top_level=True)
+    results = run_through(code.body, env, top_level=True, catch_errors=True)
+
+    for e in sorted(results['errors'], key=lambda e: e.ast_obj.lineno):
+        print(str(e))
 
 
-def run_through(exprs, env, top_level=False):
+def run_through(exprs, env, top_level=False, catch_errors=False, expected_return_type=pypes.unknown):
+    """
+    Runs through a list of expressions, e.g. a module top-level or a function body.
+    Returns a dict of errors, values, and the return type (of a function).
+    """
 
     return_type = None
 
@@ -70,11 +77,19 @@ def run_through(exprs, env, top_level=False):
                     raise Heresy("Tried to redefine built-in '%s'" % expr.targets[0].id, expr)
                 env.add(expr.targets[0].id, get_type(expr.value, env))
             elif isinstance(expr, ast.Return):
-                return_type = get_type(expr.value, env)
+                apparent_return_type = get_type(expr.value, env)
+                if DEBUG_LEVEL > 2:
+                    print("checking if %s fits expected return %s" %
+                          (return_type, expected_return_type))
+                if not pypes.type_fits(return_type, expected_return_type):
+                    raise Heresy("Trying to return '%s' but should return '%s'" %
+                                 (apparent_return_type, expected_return_type),
+                                 expr)
+
             else:
                 get_type(expr, env)
         except Heresy as e:
-            if top_level:
+            if catch_errors:
                 errors.add(e)
             else:
                 raise e
@@ -87,7 +102,7 @@ def run_through(exprs, env, top_level=False):
             if isinstance(expr, ast.FunctionDef):
                 env.add(expr.name, get_func_type_for_real(expr, env))
         except Heresy as e:
-            if top_level:
+            if catch_errors:
                 errors.add(e)
             else:
                 raise e
@@ -95,14 +110,15 @@ def run_through(exprs, env, top_level=False):
             if DEBUG_LEVEL > 0:
                 print("Unimplemented: " + e.message)
 
-    for e in sorted(errors, key=lambda e: e.ast_obj.lineno):
-        print(str(e))
-
     if top_level and DEBUG_LEVEL > 0:
         for k, v in env.values.items():
             print("%s :: %s" % (k, v))
 
-    return return_type
+    return {
+        "errors": errors,
+        "returns": return_type,
+        "values": env.values
+    }
 
 def get_type(expr, env):
     if isinstance(expr, ast.FunctionDef):
@@ -127,6 +143,8 @@ def get_type(expr, env):
         else:
             raise LazyError("Don't understand Num " + repr(expr.n), expr)
     elif isinstance(expr, ast.BinOp):
+        if DEBUG_LEVEL > 2:
+            print("Type of binop at line %d is %s" % (expr.lineno, get_binop_type(expr, env)))
         return get_binop_type(expr, env)
     else:
         raise LazyError("Don't understand expr " + repr(expr), expr)
@@ -164,7 +182,7 @@ def get_func_type_for_real(expr, env):
     for arg in expr.args.args:
         body_env.add(arg.arg, get_arg_type(arg, env))
 
-    apparent_return_type = get_func_body_type(expr.body, env.extend())
+    apparent_return_type = get_func_body_type(expr.body, env.extend(), declared_type.ret)
     if not pypes.type_fits(apparent_return_type, declared_type.ret):
         raise Heresy("Return type of '%s' declared as '%s' but seems to be '%s'" %
                      (expr.name, declared_type.ret, apparent_return_type),
@@ -173,10 +191,11 @@ def get_func_type_for_real(expr, env):
     return declared_type
 
 
-def get_func_body_type(exprs, env):
+def get_func_body_type(exprs, env, expected_return_type):
     """Given a list of exprs, get the type of what the list returns. E.g., look
     for a return statement."""
-    return run_through(exprs, env)
+    run = run_through(exprs, env, expected_return_type=expected_return_type)
+    return run['returns']
 
 def get_arg_type(ast_arg, env):
     if ast_arg.annotation:
