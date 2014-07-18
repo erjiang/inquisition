@@ -7,7 +7,7 @@ class Type():
         return T == self
 
     def __repr__(self):
-        return "<%s %s>" % (self.__class__.__name__, self.__str__())
+        return "<%s>" % (self.__class__.__name__)
 
 
 class FuncType(Type):
