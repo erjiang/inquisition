@@ -77,13 +77,13 @@ def run_through(exprs, env, top_level=False, catch_errors=False, expected_return
                     raise Heresy("Tried to redefine built-in '%s'" % expr.targets[0].id, expr)
                 env.add(expr.targets[0].id, get_type(expr.value, env))
             elif isinstance(expr, ast.Return):
-                apparent_return_type = get_type(expr.value, env)
+                return_type = get_type(expr.value, env)
                 if DEBUG_LEVEL > 2:
                     print("checking if %s fits expected return %s" %
                           (return_type, expected_return_type))
                 if not pypes.type_fits(return_type, expected_return_type):
                     raise Heresy("Trying to return '%s' but should return '%s'" %
-                                 (apparent_return_type, expected_return_type),
+                                 (return_type, expected_return_type),
                                  expr)
 
             else:
@@ -121,6 +121,8 @@ def run_through(exprs, env, top_level=False, catch_errors=False, expected_return
     }
 
 def get_type(expr, env):
+    if DEBUG_LEVEL > 2:
+        print("Getting type of %s" % expr)
     if isinstance(expr, ast.FunctionDef):
         return get_func_type(expr, env)
     elif isinstance(expr, ast.Call):
