@@ -6,6 +6,9 @@ class Type():
         """
         return T == self
 
+    def __repr__(self):
+        return "<%s %s>" % (self.__class__.__name__, self.__str__())
+
 
 class FuncType(Type):
     args = []
@@ -90,6 +93,46 @@ class Overload(set): # :: set(FuncType)
         return any([type_fits(T, X) for X in self])
 
 
+class ListType(Type):
+    # using a string here should be ok because other strings shouldn't find
+    # their way into the type system
+    inner = "emptylist"
+    
+    def __init__(self, inner_t="emptylist"):
+        self.inner = inner_t
+
+    def accepts(self, T):
+        if isinstance(T, ListType):
+            # The empty list fits all lists
+            if self.inner == "emptylist":
+                return True
+            return type_fits(T.inner, self.inner)
+        return False
+
+    def __repr__(self):
+        return "<ListType %s>" % self.inner
+
+    def __str__(self):
+        return "[%s]" % self.inner
+
+
+class DictType(Type):
+    k = "emptydict"
+    v = "emptydict"
+
+    def __init__(self, k_t="emptydict", v_t="emptydict"):
+        if v_t == "emptydict" and k_t != v_t:
+            raise ValueError("DictType requires both key and value type.")
+        self.k = k_t
+        self.v = v_t
+
+    def accepts(self, T):
+        if isinstance(T, DictType):
+            if self.k == "emptydict"
+            return type_fits(T.k, self.k) and type_fits(T.v, self.v)
+        return False
+
+
 def type_fits(A, B):
     """
     Check whether type A is a valid B.
@@ -99,6 +142,9 @@ def type_fits(A, B):
       * B is SomeType and A is in B
       * B is Maybe(X) and A is None or X
     """
+    import inquisition
+    if inquisition.DEBUG_LEVEL > 2:
+        print("checking type_fits(%s, %s)?" % (A, B))
     if A == B:  # if B is a str or A==B
         return True
     elif isinstance(B, str):

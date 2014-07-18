@@ -148,8 +148,25 @@ def get_type(expr, env):
         if DEBUG_LEVEL > 2:
             print("Type of binop at line %d is %s" % (expr.lineno, get_binop_type(expr, env)))
         return get_binop_type(expr, env)
+    elif isinstance(expr, ast.List):
+        return get_list_type(expr, env)
+    elif isinstance(expr, ast.Dict):
+        return get_dict_type(expr, env)   
     else:
         raise LazyError("Don't understand expr " + repr(expr), expr)
+
+
+def type_annotation2type(expr):
+    if isinstance(expr, ast.Name):
+        return expr.id
+    elif isinstance(expr, ast.List):
+        # TODO: create separate errors for invalid type annotations
+        if not expr.elts:
+            raise Heresy("Cannot type empty list. Try [Any] instead.", expr)
+        elif len(expr.elts) > 1:
+            raise Heresy("Cannot have multiple types in list.", expr)
+        else:
+            return pypes.ListType(type_annotation2type(expr.elts[0]))
 
 
 def get_name_type(expr, env):
@@ -166,7 +183,7 @@ def get_func_type(expr, env):
     body."""
     params = [get_arg_type(arg, env) for arg in expr.args.args]
     if expr.returns is not None:
-        rv = expr.returns.id
+        rv = type_annotation2type(expr.returns)
     else:
         rv = pypes.unknown
     return pypes.FuncType(params, rv)
@@ -275,6 +292,17 @@ def get_binop_type(expr, env):
         raise Heresy("Tried doing (%s %s %s) which doesn't match type %s" %
                      (left_t, expr.op.__class__.__name__, right_t, binop_t),
                      expr)
+
+
+def get_list_type(expr, env):
+    """
+    Right now, we only look at the first element in the list and assume that
+    all the other elements in the list are the same.
+    """
+    if not expr.elts:  # it's just an empty list
+        return pypes.ListType()
+    else:
+        return pypes.ListType(get_type(expr.elts[0], env))
 
 
 if __name__ == "__main__":
