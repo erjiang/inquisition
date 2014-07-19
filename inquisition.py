@@ -152,6 +152,8 @@ def get_type(expr, env):
         return get_list_type(expr, env)
     elif isinstance(expr, ast.Dict):
         return get_dict_type(expr, env)   
+    elif isinstance(expr, ast.Pass):
+        return None
     else:
         raise LazyError("Don't understand expr " + repr(expr), expr)
 
