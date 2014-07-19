@@ -7,7 +7,10 @@ class Type():
         return T == self
 
     def __repr__(self):
-        return "<%s>" % (self.__class__.__name__)
+        return "<%s %s>" % (self.__class__.__name__, self.__str__())
+
+    def __str__(self):
+        return "Something"
 
 
 class FuncType(Type):
@@ -121,16 +124,22 @@ class DictType(Type):
     v = "emptydict"
 
     def __init__(self, k_t="emptydict", v_t="emptydict"):
+        # make sure they didn't give us k_t but not v_t
         if v_t == "emptydict" and k_t != v_t:
             raise ValueError("DictType requires both key and value type.")
         self.k = k_t
         self.v = v_t
 
     def accepts(self, T):
+        # empty dict fits all DictType
         if isinstance(T, DictType):
-            if self.k == "emptydict"
+            if self.k == "emptydict":
+                return True
             return type_fits(T.k, self.k) and type_fits(T.v, self.v)
         return False
+
+    def __str__(self):
+        return "{%s: %s}" % (self.k, self.v)
 
 
 def type_fits(A, B):

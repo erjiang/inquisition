@@ -167,6 +167,17 @@ def type_annotation2type(expr):
             raise Heresy("Cannot have multiple types in list.", expr)
         else:
             return pypes.ListType(type_annotation2type(expr.elts[0]))
+    elif isinstance(expr, ast.Dict):
+        if not expr.keys:
+            return Heresy("Cannot type empty dict. Try {Any: Any} instead.", expr)
+        elif len(expr.keys) > 1:
+            raise Heresy("Cannot have multiple key/value types in dict.", expr)
+        else:
+            return pypes.DictType(
+                type_annotation2type(expr.keys[0]),
+                type_annotation2type(expr.values[0]))
+    else:
+        raise LazyError("Don't understand annotation %s" % expr, expr)
 
 
 def get_name_type(expr, env):
@@ -303,6 +314,19 @@ def get_list_type(expr, env):
         return pypes.ListType()
     else:
         return pypes.ListType(get_type(expr.elts[0], env))
+
+
+def get_dict_type(expr, env):
+    """
+    Right now, we only look at the first element in the list and assume that
+    all the other elements in the list are the same.
+    """
+    if not expr.values:  # it's just an empty list
+        return pypes.DictType()
+    else:
+        return pypes.DictType(
+            get_type(expr.keys[0], env),
+            get_type(expr.values[0], env))
 
 
 if __name__ == "__main__":
