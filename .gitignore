@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+
+.bin
+
+
+*.*~
+.*.swp
+
+
+bin/
+include/
+lib/
+share/
