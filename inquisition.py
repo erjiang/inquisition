@@ -102,7 +102,10 @@ def run_through(exprs, env, top_level=False, catch_errors=False, expected_return
                 if branches['errors']:
                     errors = errors.union(branches['errors'])
                 if branches['returns']:
-                    return_type = pypes.merge_types(return_Type, branchs['returns'])
+                    if return_type == 'noreturn':
+                        return_type = branches['returns']
+                    else:
+                        return_type = pypes.merge_types(return_type, branches['returns'])
             elif isinstance(expr, ast.Return):
                 if top_level:
                     raise Heresy("Can't 'return' outside of function", expr)
@@ -298,7 +301,7 @@ def get_func_body_type(exprs, env, expected_return_type):
 
 def get_arg_type(ast_arg, env):
     if ast_arg.annotation:
-        return ast_arg.annotation.id
+        return type_annotation2type(ast_arg.annotation)
     else:
         return pypes.unknown
 

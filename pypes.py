@@ -113,7 +113,7 @@ class ListType(Type):
     def accepts(self, T):
         if isinstance(T, ListType):
             # The empty list fits all lists
-            if self.inner == "emptylist":
+            if T.inner == "emptylist":
                 return True
             return type_fits(T.inner, self.inner)
         return False
@@ -193,11 +193,15 @@ def merge_types(A, B):
         if isinstance(B, set):
             return A.union(B)
         else:
-            return A.add(B)
+            newset = set(A)
+            newset.add(B)
+            return newset
     elif isinstance(B, set):
-        return B.add(A)
+        newset = set(B)
+        newset.add(A)
+        return newset
     else:
-        return SomeType([A, B])
+        return set([A, B])
 
 
 Num = set(['int', 'float'])
