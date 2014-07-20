@@ -1,5 +1,5 @@
 #!/bin/env python
-
+import ast
 import re
 
 find_sig = re.compile('#::\s*(.*?)$') #:: re.pattern
@@ -11,6 +11,7 @@ def grab_types(f):
     for lineno, line in enumerate(lines):
         match = find_sig.search(line)
         if match:
-            types[lineno] = match.groups()[0]
+            annotation = match.groups()[0]
+            types[lineno] = ast.parse(annotation).body[0].value
 
     return types

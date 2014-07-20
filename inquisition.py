@@ -62,6 +62,9 @@ def run_through(exprs, env, top_level=False, catch_errors=False, expected_return
 
     return_type = "noreturn"
 
+    if DEBUG_LEVEL > 2:
+        print("env is %s" % env)
+
     errors = set()
 
     # first get all top-level declared types without going into functions
@@ -92,7 +95,14 @@ def run_through(exprs, env, top_level=False, catch_errors=False, expected_return
                     raise Heresy("Tried to redefine built-in '%s'" % expr.targets[0].id, expr)
                 env.add(expr.targets[0].id, get_type(expr.value, env))
             elif isinstance(expr, ast.If):
-                run_if(expr, env, expected_return_type)
+                branches = run_if(expr, env,
+                       top_level=top_level,
+                       catch_errors=catch_errors,
+                       expected_return_type=expected_return_type)
+                if branches['errors']:
+                    errors = errors.union(branches['errors'])
+                if branches['returns']:
+                    return_type = pypes.merge_types(return_Type, branchs['returns'])
             elif isinstance(expr, ast.Return):
                 if top_level:
                     raise Heresy("Can't 'return' outside of function", expr)
@@ -127,7 +137,7 @@ def run_through(exprs, env, top_level=False, catch_errors=False, expected_return
     }
 
 
-def run_if(expr, env, expected_return_type):
+def run_if(expr, env, top_level=False, catch_errors=False, expected_return_type=pypes.unknown):
     """
     TODO: support elif
     """
@@ -136,26 +146,43 @@ def run_if(expr, env, expected_return_type):
         print("Exploring if statement expecting to return %s" % expected_return_type)
 
     all_branches_return = True
+    errors = set()
 
     possible_returns = set()
     if_env = env.extend()
-    if_body = run_through(expr.body, if_env, expected_return_type=expected_return_type)
+    if_body = run_through(expr.body, if_env,
+                          top_level=top_level,
+                          catch_errors=catch_errors,
+                          expected_return_type=expected_return_type)
     if if_body['returns'] != "noreturn":
         possible_returns = pypes.merge_types(possible_returns, if_body['returns'])
     else:
         all_branches_return = False
+
+    if if_body['errors']:
+        errors = errors.union(if_body['errors'])
+
     if expr.orelse:  # if there are else clauses
         else_env = env.extend()
-        else_body = run_through(expr.orelse, else_env, expected_return_type=expected_return_type)
+        else_body = run_through(expr.orelse, else_env,
+                                top_level=top_level,
+                                catch_errors=catch_errors,
+                                expected_return_type=expected_return_type)
         if else_body['returns'] != "noreturn":
             possible_returns = pypes.merge_types(possible_returns, else_body['returns'])
         else:
             all_branches_return = True
 
+        if else_body['errors']:
+            errors = errors.union(else_body['errors'])
+    else:
+        print("not going into else because there isn't one")
+
     if len(possible_returns) == 1:
         possible_returns = possible_returns.pop()
 
     return {
+        "errors": errors,
         "returns": possible_returns,
         "all_branches_return": all_branches_return
     }
