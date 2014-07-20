@@ -64,10 +64,25 @@ def run_through(exprs, env, top_level=False, catch_errors=False, expected_return
 
     errors = set()
 
+    # first get all top-level declared types without going into functions
     for expr in exprs:
         try:
             if isinstance(expr, ast.FunctionDef):
                 env.add(expr.name, get_func_type(expr, env))
+        except Heresy as e:
+            if catch_errors:
+                errors.add(e)
+            else:
+                raise e
+        except LazyError as e:
+            if DEBUG_LEVEL > 0:
+                print("Unimplemented: " + str(e))
+
+
+    for expr in exprs:
+        try:
+            if isinstance(expr, ast.FunctionDef):
+                env.add(expr.name, get_func_type_for_real(expr, env))
             elif isinstance(expr, ast.Assign):
                 if not isinstance(expr.targets[0], ast.Name):
                     raise LazyError("Don't know how to deal with tuple assignment", expr)
@@ -96,19 +111,6 @@ def run_through(exprs, env, top_level=False, catch_errors=False, expected_return
         except LazyError as e:
             if DEBUG_LEVEL > 0:
                 print("Unimplemented: " + str(e))
-
-    for expr in exprs:
-        try:
-            if isinstance(expr, ast.FunctionDef):
-                env.add(expr.name, get_func_type_for_real(expr, env))
-        except Heresy as e:
-            if catch_errors:
-                errors.add(e)
-            else:
-                raise e
-        except LazyError as e:
-            if DEBUG_LEVEL > 0:
-                print("Unimplemented: " + e.message)
 
     if top_level and DEBUG_LEVEL > 0:
         for k, v in env.values.items():
@@ -258,26 +260,23 @@ def get_call_type(call, env):
     if isinstance(call.func, ast.Attribute):
         raise LazyError("Don't know how to do method calls.", call)
     # TODO: check if func is expr, maybe use get_type instead?
-    if call.func.id in env:
-        func_t = env[call.func.id]
-        if not isinstance(func_t, (pypes.FuncType, pypes.ClassType)):
-            raise Heresy("'%s' is not callable." % func_t, call)
-        if len(call.args) != len(func_t.args):
-            raise Heresy("Function %s expects %d arguments, %d provided" %
-                            (call.func.id, len(func_t.args), len(call.args)),
-                            call)
-        for idx, args in enumerate(zip(call.args, func_t.args)):
-            arg, arg_t = args
-            call_arg_t = get_type(arg, env)
-            if not pypes.type_fits(call_arg_t, arg_t):
-                raise Heresy("Argument %d of call to %s should be %s, not %s" %
-                             (idx, call.func.id, arg_t, call_arg_t),
-                             call)
-        return func_t.ret
-    else:
-        raise Heresy("Tried calling %s which doesn't seem to exist" %
-                     (call.func.id),
-                     call)
+    func_t = get_type(call.func, env)
+    if DEBUG_LEVEL > 2:
+        print("call to %s" % func_t)
+    if not isinstance(func_t, (pypes.FuncType, pypes.ClassType)):
+        raise Heresy("'%s' is not callable." % func_t, call)
+    if len(call.args) != len(func_t.args):
+        raise Heresy("Function %s expects %d arguments, %d provided" %
+                        (call.func.id, len(func_t.args), len(call.args)),
+                        call)
+    for idx, args in enumerate(zip(call.args, func_t.args)):
+        arg, arg_t = args
+        call_arg_t = get_type(arg, env)
+        if not pypes.type_fits(call_arg_t, arg_t):
+            raise Heresy("Argument %d of call to %s should be %s, not %s" %
+                         (idx, call.func.id, arg_t, call_arg_t),
+                         call)
+    return func_t.ret
 
 
 def get_binop_type(expr, env):
