@@ -257,8 +257,11 @@ def is_callable(t):
 def get_call_type(call, env):
     if isinstance(call.func, ast.Attribute):
         raise LazyError("Don't know how to do method calls.", call)
+    # TODO: check if func is expr, maybe use get_type instead?
     if call.func.id in env:
         func_t = env[call.func.id]
+        if not isinstance(func_t, (pypes.FuncType, pypes.ClassType)):
+            raise Heresy("'%s' is not callable." % func_t, call)
         if len(call.args) != len(func_t.args):
             raise Heresy("Function %s expects %d arguments, %d provided" %
                             (call.func.id, len(func_t.args), len(call.args)),

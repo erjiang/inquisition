@@ -53,6 +53,12 @@ class FuncType(Type):
         return "(%s) -> %s" % (args, str(self.ret))
 
 
+class ClassType(Type):
+    # TODO: implement this
+    def __str__(self):
+        return "ClassType?"
+
+
 class AnyType(Type):
     def __init__(self, magic_words=None):
         if magic_words != "nuh-uh-uh":
