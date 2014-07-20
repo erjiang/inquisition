@@ -188,6 +188,18 @@ class Maybe(Type):
 SomeType = set
 
 
+def merge_types(A, B):
+    if isinstance(A, set):
+        if isinstance(B, set):
+            return A.union(B)
+        else:
+            return A.add(B)
+    elif isinstance(B, set):
+        return B.add(A)
+    else:
+        return SomeType([A, B])
+
+
 Num = set(['int', 'float'])
 
 

@@ -60,7 +60,7 @@ def run_through(exprs, env, top_level=False, catch_errors=False, expected_return
     Returns a dict of errors, values, and the return type (of a function).
     """
 
-    return_type = None
+    return_type = "noreturn"
 
     errors = set()
 
@@ -91,7 +91,11 @@ def run_through(exprs, env, top_level=False, catch_errors=False, expected_return
                 if expr.targets[0].id in CONSTANTS:
                     raise Heresy("Tried to redefine built-in '%s'" % expr.targets[0].id, expr)
                 env.add(expr.targets[0].id, get_type(expr.value, env))
+            elif isinstance(expr, ast.If):
+                run_if(expr, env, expected_return_type)
             elif isinstance(expr, ast.Return):
+                if top_level:
+                    raise Heresy("Can't 'return' outside of function", expr)
                 return_type = get_type(expr.value, env)
                 if DEBUG_LEVEL > 2:
                     print("checking if %s fits expected return %s" %
@@ -120,6 +124,40 @@ def run_through(exprs, env, top_level=False, catch_errors=False, expected_return
         "errors": errors,
         "returns": return_type,
         "values": env.values
+    }
+
+
+def run_if(expr, env, expected_return_type):
+    """
+    TODO: support elif
+    """
+
+    if DEBUG_LEVEL > 2:
+        print("Exploring if statement expecting to return %s" % expected_return_type)
+
+    all_branches_return = True
+
+    possible_returns = set()
+    if_env = env.extend()
+    if_body = run_through(expr.body, if_env, expected_return_type=expected_return_type)
+    if if_body['returns'] != "noreturn":
+        possible_returns = pypes.merge_types(possible_returns, if_body['returns'])
+    else:
+        all_branches_return = False
+    if expr.orelse:  # if there are else clauses
+        else_env = env.extend()
+        else_body = run_through(expr.orelse, else_env, expected_return_type=expected_return_type)
+        if else_body['returns'] != "noreturn":
+            possible_returns = pypes.merge_types(possible_returns, else_body['returns'])
+        else:
+            all_branches_return = True
+
+    if len(possible_returns) == 1:
+        possible_returns = possible_returns.pop()
+
+    return {
+        "returns": possible_returns,
+        "all_branches_return": all_branches_return
     }
 
 def get_type(expr, env):
@@ -154,6 +192,8 @@ def get_type(expr, env):
         return get_list_type(expr, env)
     elif isinstance(expr, ast.Dict):
         return get_dict_type(expr, env)   
+    elif isinstance(expr, ast.If):
+        raise Heresy("if statement found outside module/function body")
     elif isinstance(expr, ast.Pass):
         return None
     else:
