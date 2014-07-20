@@ -175,8 +175,6 @@ def run_if(expr, env, top_level=False, catch_errors=False, expected_return_type=
 
         if else_body['errors']:
             errors = errors.union(else_body['errors'])
-    else:
-        print("not going into else because there isn't one")
 
     if len(possible_returns) == 1:
         possible_returns = possible_returns.pop()
