@@ -1,2 +1,2 @@
 def nothing() -> None:
-    return 5  ##ERROR return should be 5
+    return 5  ##ERROR returning int but should return None
