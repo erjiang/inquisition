@@ -27,8 +27,7 @@ class FuncType(Type):
         if len(self.args) != len(given_args):
             return False
 
-        for idx, args in enumerate(zip(self.args, given_args)):
-            my_arg, call_arg = args
+        for my_arg, call_arg in zip(self.args, given_args):
             if not type_fits(call_arg, my_arg):
                 return False
         return True
@@ -54,6 +53,21 @@ class FuncType(Type):
 
 
 class ClassType(Type):
+    """Classes have their own internal environment, which are its 'fields' and
+    'methods'. Really, it's the top-level declarations within the class body."""
+
+    # TODO: support inheritance
+    # TODO: support multiple bases
+    # bases = []
+    inherits = None
+
+    env = None
+
+    def __init__(self, inherits=None, env=None):
+        self.inherits = inherits
+        if env is not None:
+            self.env = env
+
     # TODO: implement this
     def __str__(self):
         return "ClassType?"

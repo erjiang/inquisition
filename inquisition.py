@@ -86,6 +86,8 @@ def run_through(exprs, env, top_level=False, catch_errors=False, expected_return
         try:
             if isinstance(expr, ast.FunctionDef):
                 env.add(expr.name, get_func_type_for_real(expr, env))
+            elif isinstance(expr, ast.ClassDef):
+                env.add(expr.name, get_class_type(expr, env))
             elif isinstance(expr, ast.Assign):
                 if not isinstance(expr.targets[0], ast.Name):
                     raise LazyError("Don't know how to deal with tuple assignment", expr)
@@ -224,6 +226,8 @@ def get_type(expr, env):
         raise Heresy("if statement found outside module/function body")
     elif isinstance(expr, ast.Pass):
         return None
+    elif isinstance(expr, ast.ClassDef):
+        return get_class_type(expr, env)
     else:
         raise LazyError("Don't understand expr " + repr(expr), expr)
 
@@ -331,20 +335,38 @@ def get_call_type(call, env):
     func_t = get_type(call.func, env)
     if DEBUG_LEVEL > 2:
         print("call to %s" % func_t)
-    if not isinstance(func_t, (pypes.FuncType, pypes.ClassType)):
+    if isinstance(func_t, pypes.FuncType):
+        if len(call.args) != len(func_t.args):
+            raise Heresy("Function %s expects %d arguments, %d provided" %
+                            (call.func.id, len(func_t.args), len(call.args)),
+                            call)
+        for idx, args in enumerate(zip(call.args, func_t.args)):
+            arg, arg_t = args
+            call_arg_t = get_type(arg, env)
+            if not pypes.type_fits(call_arg_t, arg_t):
+                raise Heresy("Argument %d of call to %s should be %s, not %s" %
+                             (idx, call.func.id, arg_t, call_arg_t),
+                             call)
+        return func_t.ret
+    elif isinstance(func_t, pypes.ClassType):
+        """For a class Foo, calling Foo(*args) should result in an object of
+        type Foo."""
+        # TODO: support no initializer (no args)
+        init = func_t.env['__init__']
+        if len(call.args) + 1 != len(init.args):
+            raise Heresy("Class initializer %s() expects %d arguments, %d provided" %
+                            (call.func.id, len(init.args), len(call.args)),
+                            call)
+        for idx, args in enumerate(zip(call.args, init.args[1:])):
+            arg, arg_t = args
+            call_arg_t = get_type(arg, env)
+            if not pypes.type_fits(call_arg_t, arg_t):
+                raise Heresy("Argument %d of call to %s should be %s, not %s" %
+                             (idx, call.func.id, arg_t, call_arg_t),
+                             call)
+        return func_t
+    else:
         raise Heresy("'%s' is not callable." % func_t, call)
-    if len(call.args) != len(func_t.args):
-        raise Heresy("Function %s expects %d arguments, %d provided" %
-                        (call.func.id, len(func_t.args), len(call.args)),
-                        call)
-    for idx, args in enumerate(zip(call.args, func_t.args)):
-        arg, arg_t = args
-        call_arg_t = get_type(arg, env)
-        if not pypes.type_fits(call_arg_t, arg_t):
-            raise Heresy("Argument %d of call to %s should be %s, not %s" %
-                         (idx, call.func.id, arg_t, call_arg_t),
-                         call)
-    return func_t.ret
 
 
 def get_binop_type(expr, env):
@@ -361,12 +383,12 @@ def get_binop_type(expr, env):
     # can't directly do BINOPS[expr.op], unfortunately
     binop_method = BINOPS[expr.op.__class__.__name__]
 
-    if left_t not in builtins.builtins:
+    if left_t not in builtins.classes:
         if DEBUG_LEVEL > 0:
             print("Type %s is not recognized. Can't typecheck this binop." % left_t)
         return pypes.unknown
 
-    binop_t = builtins.builtins[left_t][binop_method]
+    binop_t = builtins.classes[left_t][binop_method]
     # should be a FuncType
 
     try:
@@ -399,6 +421,17 @@ def get_dict_type(expr, env):
         return pypes.DictType(
             get_type(expr.keys[0], env),
             get_type(expr.values[0], env))
+
+
+def get_class_type(expr, env):
+    if len(expr.bases) > 1:
+        raise LazyError("Multiple class bases not yet supported.")
+
+    results = run_through(expr.body, env)
+    if expr.bases:
+        return pypes.ClassType(expr.bases[0], results['values'])
+    else:
+        return pypes.ClassType(None, results['values'])
 
 
 if __name__ == "__main__":
