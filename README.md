@@ -1,5 +1,7 @@
 A static type system and checker for Python.
 
+*Work in progress!* Not ready for "real" code.
+
 Requirements: python3
 
 Usage: `inquisition.py somefile.py`
